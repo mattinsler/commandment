@@ -1,47 +1,50 @@
-# heroku.node
+# Commandment
 
-[Heroku API](https://api-docs.heroku.com) client for node.js
+Commandline for node.js
 
 ## Installation
 ```
-npm install heroku.node
+npm install commandment
 ```
 
 ## Usage
 
+##### main.js
 ```javascript
-var Heroku = require('heroku.node');
+var Commandment = require('commandment')
+  , commands = new Commandment({name: 'my-app', command_dir: __dirname + '/commands'});
 
-var client = new Heroku({api_key: '...'});
-// Do something with client
+commands.before_execute(function(context, next) {
+  context.hello_helper = function() {
+    // You can call me from commands now
+    return 'hello world';
+  };
+});
+
+commands.after_execute(function(context, err, next) {
+  if (err) return console.error(err.stack);
+  context.log('Yay! Everything is fine');
+  next();
+});
+
+commands.execute(process.argv);
 ```
 
-## Constructors
+Commands are just exported from files in the commands directory
 
-#### new Heroku({api_key: '...'})
+##### commands/hello.js
+```javascript
+exports.hello = function(callback) {
+  this.log(this.hello_helper());
+  callback()
+};
 
-## Methods
-
-### Apps API
-
-#### client.apps.list(callback)
-
-#### client.app('app-name').get(callback)
-#### client.app('app-name').maintenance_mode_on(callback)
-#### client.app('app-name').maintenance_mode_off(callback)
-#### client.app('app-name').destroy(callback)
-
-### Processes API
-
-#### client.app('app-name').processes.list(callback)
-#### client.app('app-name').processes.restart(callback)
-#### client.app('app-name').processes.restart_type('process-type', callback)
-#### client.app('app-name').processes.stop(callback)
-#### client.app('app-name').processes.stop_type('process-type', callback)
-#### client.app('app-name').processes.scale('process-type', quantity, callback)
-
-#### client.app('app-name').process('process-id').restart(callback)
-#### client.app('app-name').process('process-id').stop(callback)
+// There can be multiple per file
+exports.hello_person = function(name, callback) {
+  this.log('Hello ' + name);
+  callback();
+};
+```
 
 ## License
 Copyright (c) 2013 Matt Insler  
