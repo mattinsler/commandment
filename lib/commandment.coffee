@@ -19,6 +19,7 @@ logger.cli()
 
 class Commandment
   constructor: (opts) ->
+    @_properties = {}
     @name = opts.name
     if opts.command_dir?
       @commands = {}
@@ -74,6 +75,12 @@ class Commandment
       command: name
       params: args or []
       opts: opts
+      properties: @_properties
+      get: @get.bind(@)
+      set: =>
+        @set(arguments...)
+        context
+      
       log: logger.log.bind(logger, name)
       error: logger.error.bind(logger)
       logger: logger
@@ -86,9 +93,18 @@ class Commandment
   
   before_execute: (cb) ->
     @filters.before.push(cb)
+    @
 
   after_execute: (cb) ->
     @filters.after.push(cb)
+    @
+  
+  get: (key) ->
+    @_properties[key]
+  
+  set: (vals) ->
+    @_properties[k] = v for k, v of vals
+    @
   
   execute: (argv) ->
     data = @_parse_args(argv)

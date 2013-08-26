@@ -43,6 +43,7 @@
 
     function Commandment(opts) {
       var file, _i, _len, _ref2, _ref3, _ref4, _ref5;
+      this._properties = {};
       this.name = opts.name;
       if (opts.command_dir != null) {
         this.commands = {};
@@ -112,6 +113,12 @@
         command: name,
         params: args || [],
         opts: opts,
+        properties: this._properties,
+        get: this.get.bind(this),
+        set: function() {
+          _this.set.apply(_this, arguments);
+          return context;
+        },
         log: logger.log.bind(logger, name),
         error: logger.error.bind(logger),
         logger: logger,
@@ -127,11 +134,25 @@
     };
 
     Commandment.prototype.before_execute = function(cb) {
-      return this.filters.before.push(cb);
+      this.filters.before.push(cb);
+      return this;
     };
 
     Commandment.prototype.after_execute = function(cb) {
-      return this.filters.after.push(cb);
+      this.filters.after.push(cb);
+      return this;
+    };
+
+    Commandment.prototype.get = function(key) {
+      return this._properties[key];
+    };
+
+    Commandment.prototype.set = function(vals) {
+      for (k in vals) {
+        v = vals[k];
+        this._properties[k] = v;
+      }
+      return this;
     };
 
     Commandment.prototype.execute = function(argv) {
