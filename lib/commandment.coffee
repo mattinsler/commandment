@@ -90,8 +90,9 @@ class Commandment
   after_execute: (cb) ->
     @filters.after.push(cb)
   
-  execute: (argv, callback) ->
+  execute: (argv) ->
     data = @_parse_args(argv)
+    callback = -> process.exit(0)
     
     return @_execute_command(data, callback) if data.command?
     return @_execute_command(name: 'help', opts: data.opts, command: @commands.help, callback) if (data.name? and @commands.help?) or (!data.name? and !@commands.__default__?)
