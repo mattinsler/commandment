@@ -1,5 +1,5 @@
 (function() {
-  var Commandment, async, chalk, colors, fs, k, levels, logger, nopt, path, v, winston, _ref, _ref1;
+  var Commandment, async, chalk, colors, fs, k, levels, logger, nopt, path, prompt, v, winston, _ref, _ref1;
 
   fs = require('fs');
 
@@ -10,6 +10,8 @@
   async = require('async');
 
   chalk = require('chalk');
+
+  prompt = require('prompt');
 
   winston = require('winston');
 
@@ -95,7 +97,7 @@
     };
 
     Commandment.prototype._execute_command = function(data, callback) {
-      var args, command, context, name, opts, prompt,
+      var args, command, context, name, opts,
         _this = this;
       name = data.name, args = data.args, opts = data.opts, command = data.command;
       if (levels[name] == null) {
@@ -104,7 +106,6 @@
         logger.setLevels(levels);
         winston.addColors(colors);
       }
-      prompt = require('prompt');
       prompt.message = chalk[colors[name]](name);
       prompt.start();
       context = {

@@ -3,6 +3,7 @@ nopt = require 'nopt'
 path = require 'path'
 async = require 'async'
 chalk = require 'chalk'
+prompt = require 'prompt'
 winston = require 'winston'
 
 winston.cli()
@@ -66,7 +67,6 @@ class Commandment
       logger.setLevels(levels)
       winston.addColors(colors)
     
-    prompt = require 'prompt'
     prompt.message = chalk[colors[name]](name)
     prompt.start()
     

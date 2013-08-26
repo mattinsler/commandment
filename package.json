@@ -29,7 +29,8 @@
     "async": "~0.2.9",
     "chalk": "~0.2.0",
     "nopt": "~2.1.2",
-    "winston": "~0.7.2"
+    "winston": "~0.7.2",
+    "prompt": "~0.2.11"
   },
   "devDependencies": {
     "grunt": "~0.3.15",
