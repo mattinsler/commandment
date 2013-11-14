@@ -1,5 +1,8 @@
 (function() {
-  var Commandment, async, chalk, colors, fs, k, levels, logger, nopt, path, prompt, v, winston, _ref, _ref1;
+  var Commandment, Logger, chalk, fs, nopt, path, prompt, q, util,
+    __slice = [].slice;
+
+  q = require('q');
 
   fs = require('fs');
 
@@ -7,59 +10,42 @@
 
   path = require('path');
 
-  async = require('async');
+  util = require('util');
 
   chalk = require('chalk');
 
-  prompt = require('prompt');
+  prompt = require('./prompt');
 
-  winston = require('winston');
-
-  winston.cli();
-
-  levels = {};
-
-  _ref = winston.config.cli.levels;
-  for (k in _ref) {
-    v = _ref[k];
-    levels[k] = v;
-  }
-
-  colors = {};
-
-  _ref1 = winston.config.cli.colors;
-  for (k in _ref1) {
-    v = _ref1[k];
-    colors[k] = v;
-  }
-
-  logger = new winston.Logger({
-    transports: [new winston.transports.Console()]
-  });
-
-  logger.cli();
+  Logger = require('./logger');
 
   Commandment = (function() {
+    Commandment.nopt = nopt;
+
+    Commandment.chalk = chalk;
+
+    Commandment.prompt = prompt;
 
     function Commandment(opts) {
-      var file, _i, _len, _ref2, _ref3, _ref4, _ref5;
+      if (!(this instanceof Commandment)) {
+        return new Commandment(opts);
+      }
       this._properties = {};
       this.name = opts.name;
       if (opts.command_dir != null) {
-        this.commands = {};
-        _ref2 = fs.readdirSync(opts.command_dir);
-        for (_i = 0, _len = _ref2.length; _i < _len; _i++) {
-          file = _ref2[_i];
-          if (!((_ref3 = file[0]) === '.' || _ref3 === '_')) {
-            _ref4 = require(path.join(opts.command_dir, file));
-            for (k in _ref4) {
-              v = _ref4[k];
-              this.commands[k] = v;
-            }
+        this.commands = fs.readdirSync(opts.command_dir).reduce(function(o, file) {
+          var k, v, _ref, _ref1;
+          if ((_ref = file[0]) === '.' || _ref === '_') {
+            return o;
           }
-        }
+          _ref1 = require(path.join(opts.command_dir, file));
+          for (k in _ref1) {
+            v = _ref1[k];
+            o[k] = v;
+          }
+          return o;
+        }, {});
       }
-      if ((_ref5 = this.commands) == null) {
+      if (this.commands == null) {
         this.commands = opts.commands;
       }
       this.filters = {
@@ -85,30 +71,27 @@
       return data;
     };
 
-    Commandment.prototype._before_execute = function(context, callback) {
-      return async.eachSeries(this.filters.before, function(filter, cb) {
-        return filter(context, cb);
-      }, callback);
+    Commandment.prototype._before_execute = function(context) {
+      return this.filters.before.reduce(function(promise, filter) {
+        return promise.then(function() {
+          return filter(context);
+        });
+      }, q());
     };
 
-    Commandment.prototype._after_execute = function(context, err, callback) {
-      return async.eachSeries(this.filters.after, function(filter, cb) {
-        return filter(context, err, cb);
-      }, callback);
+    Commandment.prototype._after_execute = function(context, err) {
+      return this.filters.after.reduce(function(promise, filter) {
+        return promise.then(function() {
+          return filter(context, err);
+        });
+      }, q());
     };
 
-    Commandment.prototype._execute_command = function(data, callback) {
-      var args, command, context, name, opts,
+    Commandment.prototype._execute_command = function(data) {
+      var args, command, context, logger, name, opts,
         _this = this;
       name = data.name, args = data.args, opts = data.opts, command = data.command;
-      if (levels[name] == null) {
-        levels[name] = 10;
-        colors[name] = 'magenta';
-        logger.setLevels(levels);
-        winston.addColors(colors);
-      }
-      prompt.message = chalk[colors[name]](name);
-      prompt.start();
+      logger = Logger();
       context = {
         command: name,
         params: args || [],
@@ -119,17 +102,29 @@
           _this.set.apply(_this, arguments);
           return context;
         },
-        log: logger.log.bind(logger, name),
+        log: function() {
+          var args;
+          args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+          if ((logger[name] != null) && name !== 'log') {
+            return logger[name].apply(logger, args);
+          }
+          return logger.log(util.format.apply(util, args), {
+            prefix: name,
+            color: 'magenta'
+          });
+        },
         error: logger.error.bind(logger),
         logger: logger,
-        prompt: prompt
+        prompt: prompt({
+          prefix: chalk.magenta(name)
+        })
       };
-      return this._before_execute(context, function(err) {
-        return command.apply(context, context.params.concat(function(err) {
-          return _this._after_execute(context, err, function(err) {
-            return typeof callback === "function" ? callback(err) : void 0;
-          });
-        }));
+      return this._before_execute(context).then(function() {
+        return command.apply(context, context.params);
+      }).then(function() {
+        return _this._after_execute(context);
+      })["catch"](function(err) {
+        return _this._after_execute(context, err);
       });
     };
 
@@ -148,6 +143,7 @@
     };
 
     Commandment.prototype.set = function(vals) {
+      var k, v;
       for (k in vals) {
         v = vals[k];
         this._properties[k] = v;
@@ -156,29 +152,32 @@
     };
 
     Commandment.prototype.execute = function(argv) {
-      var callback, data;
+      var args, data;
       data = this._parse_args(argv);
-      callback = function() {
-        return process.exit(0);
-      };
       if (data.command != null) {
-        return this._execute_command(data, callback);
+        args = [data];
+      } else if (((data.name != null) && (this.commands.help != null)) || ((data.name == null) && (this.commands.__default__ == null))) {
+        args = [
+          {
+            name: 'help',
+            opts: data.opts,
+            command: this.commands.help
+          }
+        ];
+      } else if ((data.name == null) && (this.commands.__default__ != null)) {
+        args = [
+          {
+            name: this.name,
+            opts: data.opts,
+            command: this.commands.__default__
+          }
+        ];
+      } else {
+        process.exit(1);
       }
-      if (((data.name != null) && (this.commands.help != null)) || (!(data.name != null) && !(this.commands.__default__ != null))) {
-        return this._execute_command({
-          name: 'help',
-          opts: data.opts,
-          command: this.commands.help
-        }, callback);
-      }
-      if (!(data.name != null) && (this.commands.__default__ != null)) {
-        return this._execute_command({
-          name: this.name,
-          opts: data.opts,
-          command: this.commands.__default__
-        }, callback);
-      }
-      return process.exit(1);
+      return this._execute_command.apply(this, args).then(function() {
+        return process.exit(0);
+      });
     };
 
     return Commandment;

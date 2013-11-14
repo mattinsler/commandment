@@ -1,31 +1,28 @@
+q = require 'q'
 fs = require 'fs'
 nopt = require 'nopt'
 path = require 'path'
-async = require 'async'
+util = require 'util'
 chalk = require 'chalk'
-prompt = require 'prompt'
-winston = require 'winston'
-
-winston.cli()
-
-levels = {}
-levels[k] = v for k, v of winston.config.cli.levels
-colors = {}
-colors[k] = v for k, v of winston.config.cli.colors
-
-logger = new winston.Logger(transports: [new (winston.transports.Console)()])
-logger.cli()
-
+prompt = require './prompt'
+Logger = require './logger'
 
 class Commandment
+  @nopt: nopt
+  @chalk: chalk
+  @prompt: prompt
+  
   constructor: (opts) ->
+    return new Commandment(opts) unless @ instanceof Commandment
+    
     @_properties = {}
     @name = opts.name
     if opts.command_dir?
-      @commands = {}
-      for file in fs.readdirSync(opts.command_dir) when !(file[0] in ['.', '_'])
-        for k, v of require(path.join(opts.command_dir, file))
-          @commands[k] = v
+      @commands = fs.readdirSync(opts.command_dir).reduce (o, file) ->
+        return o if file[0] in ['.', '_']
+        o[k] = v for k, v of require(path.join(opts.command_dir, file))
+        o
+      , {}
     
     @commands ?= opts.commands
     
@@ -49,27 +46,20 @@ class Commandment
     
     data
   
-  _before_execute: (context, callback) ->
-    async.eachSeries @filters.before, (filter, cb) ->
-      filter(context, cb)
-    , callback
+  _before_execute: (context) ->
+    @filters.before.reduce (promise, filter) ->
+      promise.then -> filter(context)
+    , q()
   
-  _after_execute: (context, err, callback) ->
-    async.eachSeries @filters.after, (filter, cb) ->
-      filter(context, err, cb)
-    , callback
+  _after_execute: (context, err) ->
+    @filters.after.reduce (promise, filter) ->
+      promise.then -> filter(context, err)
+    , q()
   
-  _execute_command: (data, callback) ->
+  _execute_command: (data) ->
     {name, args, opts, command} = data
     
-    unless levels[name]?
-      levels[name] = 10
-      colors[name] = 'magenta'
-      logger.setLevels(levels)
-      winston.addColors(colors)
-    
-    prompt.message = chalk[colors[name]](name)
-    prompt.start()
+    logger = Logger()
     
     context =
       command: name
@@ -81,15 +71,20 @@ class Commandment
         @set(arguments...)
         context
       
-      log: logger.log.bind(logger, name)
+      log: (args...) ->
+        return logger[name](args...) if logger[name]? and name isnt 'log'
+        logger.log(util.format(args...), prefix: name, color: 'magenta')
       error: logger.error.bind(logger)
       logger: logger
-      prompt: prompt
+      prompt: prompt(prefix: chalk.magenta(name))
     
-    @_before_execute context, (err) =>
-      command.apply context, context.params.concat (err) =>
-        @_after_execute context, err, (err) =>
-          callback?(err)
+    @_before_execute(context)
+    .then ->
+      command.apply(context, context.params)
+    .then =>
+      @_after_execute(context)
+    .catch (err) =>
+      @_after_execute(context, err)
   
   before_execute: (cb) ->
     @filters.before.push(cb)
@@ -108,11 +103,18 @@ class Commandment
   
   execute: (argv) ->
     data = @_parse_args(argv)
-    callback = -> process.exit(0)
     
-    return @_execute_command(data, callback) if data.command?
-    return @_execute_command(name: 'help', opts: data.opts, command: @commands.help, callback) if (data.name? and @commands.help?) or (!data.name? and !@commands.__default__?)
-    return @_execute_command(name: @name, opts: data.opts, command: @commands.__default__, callback) if !data.name? and @commands.__default__?
-    process.exit(1)
+    if data.command?
+      args = [data]
+    else if (data.name? and @commands.help?) or (!data.name? and !@commands.__default__?)
+      args = [name: 'help', opts: data.opts, command: @commands.help]
+    else if !data.name? and @commands.__default__?
+      args = [name: @name, opts: data.opts, command: @commands.__default__]
+    else
+      process.exit(1)
+    
+    @_execute_command(args...)
+    .then ->
+      process.exit(0)
 
 module.exports = Commandment
