@@ -56,7 +56,7 @@
 
     Commandment.prototype._parse_args = function(argv) {
       var args, data, opts;
-      opts = nopt(argv);
+      opts = nopt({}, {}, argv, 2);
       args = Array.prototype.slice.call(opts.argv.remain);
       delete opts.argv;
       data = {

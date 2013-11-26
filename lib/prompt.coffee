@@ -26,20 +26,22 @@ module.exports = (prompt_opts = {}) ->
       
         text = ''
         on_data = (c) ->
-          switch c[0]
-            when 13
-              stop()
-              stream_out.write('\n')
-              return d.resolve(text)
-            when 3
-              stop()
-              process.exit(1)
-            when 127
-              text = text.slice(0, -1)
-              stream_out.write("\x1B[1D \x1B[1D")
-            else
-              text += c.toString()
-              stream_out.write('*')
+          for x in [0...buffer.length]
+            c = buffer[x]
+            switch c
+              when 13
+                stop()
+                stream_out.write('\n')
+                return d.resolve(text)
+              when 3
+                stop()
+                process.exit(1)
+              when 127
+                text = text.slice(0, -1)
+                stream_out.write("\x1B[1D \x1B[1D")
+              else
+                text += Buffer([c]).toString()
+                stream_out.write('*')
       
         stream_in.on('data', on_data)
       

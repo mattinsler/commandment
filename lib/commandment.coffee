@@ -31,7 +31,7 @@ class Commandment
       after: []
   
   _parse_args: (argv) ->
-    opts = nopt(argv)
+    opts = nopt({}, {}, argv, 2)
     args = Array::slice.call(opts.argv.remain)
     delete opts.argv
     

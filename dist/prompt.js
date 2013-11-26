@@ -40,20 +40,26 @@
           };
           text = '';
           on_data = function(c) {
-            switch (c[0]) {
-              case 13:
-                stop();
-                stream_out.write('\n');
-                return d.resolve(text);
-              case 3:
-                stop();
-                return process.exit(1);
-              case 127:
-                text = text.slice(0, -1);
-                return stream_out.write("\x1B[1D \x1B[1D");
-              default:
-                text += c.toString();
-                return stream_out.write('*');
+            var x, _i, _ref;
+            for (x = _i = 0, _ref = buffer.length; 0 <= _ref ? _i < _ref : _i > _ref; x = 0 <= _ref ? ++_i : --_i) {
+              c = buffer[x];
+              switch (c) {
+                case 13:
+                  stop();
+                  stream_out.write('\n');
+                  return d.resolve(text);
+                case 3:
+                  stop();
+                  process.exit(1);
+                  break;
+                case 127:
+                  text = text.slice(0, -1);
+                  stream_out.write("\x1B[1D \x1B[1D");
+                  break;
+                default:
+                  text += Buffer([c]).toString();
+                  stream_out.write('*');
+              }
             }
           };
           stream_in.on('data', on_data);
