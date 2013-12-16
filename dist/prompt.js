@@ -39,10 +39,10 @@
             return stream_in.setRawMode(false);
           };
           text = '';
-          on_data = function(c) {
-            var x, _i, _ref;
-            for (x = _i = 0, _ref = buffer.length; 0 <= _ref ? _i < _ref : _i > _ref; x = 0 <= _ref ? ++_i : --_i) {
-              c = buffer[x];
+          on_data = function(buffer) {
+            var c, _i, _len;
+            for (_i = 0, _len = buffer.length; _i < _len; _i++) {
+              c = buffer[_i];
               switch (c) {
                 case 13:
                   stop();

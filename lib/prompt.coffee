@@ -25,9 +25,8 @@ module.exports = (prompt_opts = {}) ->
           stream_in.setRawMode(false)
       
         text = ''
-        on_data = (c) ->
-          for x in [0...buffer.length]
-            c = buffer[x]
+        on_data = (buffer) ->
+          for c in buffer
             switch c
               when 13
                 stop()
@@ -42,7 +41,7 @@ module.exports = (prompt_opts = {}) ->
               else
                 text += Buffer([c]).toString()
                 stream_out.write('*')
-      
+        
         stream_in.on('data', on_data)
       
       else
